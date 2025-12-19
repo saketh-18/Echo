@@ -1,14 +1,33 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, WebSocket, WebSocketDisconnect
 import json
 from datetime import datetime
 import uuid
 import asyncio
 import time
+from database.session import get_db
 from core.state import state
 import asyncio
 from core.state import state
+from database.models.user import User
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from routers.auth import fastapi_users, auth_backend, UserRead, UserCreate, get_token_payload
 
-app = FastAPI();
+app = FastAPI()
+
+# This automatically creates /auth/jwt/login and /auth/jwt/logout
+app.include_router(
+    fastapi_users.get_auth_router(auth_backend),
+    prefix="/auth",
+    tags=["auth"],
+)
+
+# This automatically creates /auth/register
+app.include_router(
+    fastapi_users.get_register_router(UserRead, UserCreate),
+    prefix="/auth",
+    tags=["auth"],
+)
 
 async def heartbeat(websocket : WebSocket, state : dict):
     try:
@@ -23,6 +42,26 @@ async def heartbeat(websocket : WebSocket, state : dict):
                 break
     except:
         pass;
+    
+
+@app.get("/all_users")
+async def home_route(db : AsyncSession = Depends(get_db)):
+    query = select(User);
+    
+    result = await db.execute(query);
+    return result.scalars().all()
+
+
+@app.get("/protected")
+def validate(payload : dict = Depends(get_token_payload)):
+    user_id = payload.get("sub");
+    
+    return {
+        "userid" : user_id,
+        "message" : "yayyyy"
+    }
+    
+    
 
 @app.websocket("/ws")
 async def websocket_handler(websocket : WebSocket):
@@ -91,5 +130,8 @@ async def websocket_handler(websocket : WebSocket):
     except Exception as e:
         print(f"Error: {e}")
             
-            
+
+
+
+  
             
