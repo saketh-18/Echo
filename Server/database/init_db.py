@@ -3,6 +3,7 @@ from database.session import engine
 from database.base import Base
 from database.models.user import User
 from database.models.connection import Connection
+from database.models.messages import Messages
 
 async def init_db():
     async with engine.begin() as conn:

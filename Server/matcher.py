@@ -8,6 +8,8 @@ class MatchHandler:
         self.user_to_rooms = {};
         self.lock = asyncio.Lock();
         self.username_map = {};
+        self.active_users = {} # map uuid to websocket
+        
         
     def get_partner(self, room_id, websocket):
         s1, s2 = self.rooms.get(room_id, (None, None))

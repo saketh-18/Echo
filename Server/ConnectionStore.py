@@ -6,6 +6,8 @@ class ConnectionStore:
         self.pending_saves = {};
         self.user_connections = {};
         self.connections = {};
+        self.sessions = {};
+        
         
         
     def create_request(self, room_id, from_user, to_user):

@@ -42,7 +42,7 @@ async def get_user_manager(user_db=Depends(get_user_db)):
 bearer_transport = BearerTransport(tokenUrl="auth/login")
 
 def get_jwt_strategy() -> JWTStrategy:
-    return JWTStrategy(secret=SECRET, lifetime_seconds=3600)
+    return JWTStrategy(secret=SECRET, lifetime_seconds=36000) # validity = one hour
 
 auth_backend = AuthenticationBackend(
     name="jwt",
@@ -58,9 +58,13 @@ fastapi_users = FastAPIUsers[User, uuid.UUID](
 
 # current_active_user = fastapi_users.current_user(active=True)
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
-def get_token_payload(credentials: HTTPAuthorizationCredentials = Depends(security)):
+def get_token_payload(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict | None:
+    
+    
+    if credentials is None:
+        return None
     token = credentials.credentials
     
     try:
@@ -72,18 +76,45 @@ def get_token_payload(credentials: HTTPAuthorizationCredentials = Depends(securi
         # 2. Return the raw payload (e.g., {'sub': 'uuid...', 'exp': ...})
         return payload
         
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has expired",
-            headers={"WWW-Authenticate": "Bearer"},
+    except (jwt.ExpiredSignatureError, jwt.PyJWTError):
+        # OPTION A: If they send a BAD token, treat them as anonymous (return None)
+        return None
+    
+
+
+def decode_fastapi_users_jwt(token: str):
+    """
+    Decode JWT token from fastapi-users.
+    Tries with audience first, then without if that fails.
+    """
+    try:
+        # Try decoding with audience first (fastapi-users default)
+        payload = jwt.decode(
+            token, 
+            SECRET, 
+            algorithms=["HS256"], 
+            audience="fastapi-users:auth"
         )
-    except jwt.PyJWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    
-    
+        return payload
+    except jwt.InvalidAudienceError:
+        # Token doesn't have the expected audience, try without audience check
+        try:
+            payload = jwt.decode(
+                token, 
+                SECRET, 
+                algorithms=["HS256"],
+                options={"verify_aud": False}
+            )
+            return payload
+        except (jwt.ExpiredSignatureError, jwt.PyJWTError) as e:
+            print(f"JWT decode error (without audience): {e}")
+            return None
+    except jwt.ExpiredSignatureError as e:
+        print(f"JWT token expired: {e}")
+        return None
+    except jwt.PyJWTError as e:
+        print(f"JWT decode error: {e}")
+        return None
+    except Exception as e:
+        print(f"Unexpected error decoding JWT: {e}")
+        return None

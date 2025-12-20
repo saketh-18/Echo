@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from fastapi import Depends
@@ -17,6 +18,7 @@ AsyncSessionLocal = sessionmaker(
     expire_on_commit=False
 )
 
+# @asynccontextmanager
 async def get_db(): # handles cleanup to be used as a dependency in fastapi server
     async with AsyncSessionLocal() as session:
         yield session
