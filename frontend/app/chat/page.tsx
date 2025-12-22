@@ -9,6 +9,7 @@ import PartnerFound from "@/src/components/PartnerFound";
 import PartnerSkipped from "@/src/components/PartnerSkipped";
 import SavedChats from "@/src/components/savedChats";
 import { messageStore } from "@/stores/message-store";
+import { pairedStore } from "@/stores/paired-store";
 import { uiStateStore } from "@/stores/uiState-store";
 import { usernameStore } from "@/stores/user-store";
 import React, { FormEvent, useEffect, useState } from "react";
@@ -18,7 +19,11 @@ export default function Page() {
   // const [messages, setMessages] = useState<Message[]>([]);
   const [currentMsg, setCurrentMsg] = useState("");
   const [ws, setWs] = useState<WebSocket | null>();
-  const [pairedTo, setPairedTo] = useState("");
+
+  // const [pairedTo, setPairedTo] = useState("");
+  const pairedTo = pairedStore((state) => state.pairedTo);
+  const setPairedTo = pairedStore((state) => state.setPairedTo);
+
   const username = usernameStore((state) => state.username);
   const uiState = uiStateStore((state) => state.uiState);
   const setUiState = uiStateStore((state) => state.setUiState);
@@ -164,6 +169,13 @@ export default function Page() {
                 </button>
               </>
             )}
+            {
+              uiState === "saved_chat" && 
+              <button
+                  onClick={() => setUiState("form")}
+                  className="rounded-full bg-surface-highlight p-4 shadow-sm hover:shadow-accent border-1 border-surface-highlight"
+                >Random Chat</button>
+            }
           </div>
         </div>
         {/* ================= CHAT ROOM ================= */}

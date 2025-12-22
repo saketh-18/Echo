@@ -16,7 +16,8 @@ export default function SavedChats() {
     async function getMessages(connId: string) {
       if (connId.trim().length == 0) return;
       const access_token = localStorage.getItem("access_token");
-      if (access_token?.length == 0) return;
+      // if (access_token?.length == 0) return;
+      setUiState("saved_chat");
       const queryParams = new URLSearchParams({
         connection_id: connId,
       });
@@ -39,7 +40,7 @@ export default function SavedChats() {
           }),
         }));
         setMessages(cleanedMessages);
-        setUiState("chatting");
+        console.log(cleanedMessages)
       }
     }
 

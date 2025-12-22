@@ -4,6 +4,7 @@ import { useState } from "react";
 import Navbar from "@/src/components/Navbar";
 import { useRouter } from "next/navigation";
 import { loginStore } from "@/stores/login-store";
+import { usernameStore } from "@/stores/user-store";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -12,6 +13,7 @@ export default function Login() {
   const [error, setError] = useState("");
   const router = useRouter(); //from next navigation
   const setIsLoggedIn = loginStore((state) => state.setIsLoggedIn);
+  const setUsername = usernameStore((state) => state.setUsername);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,6 +37,21 @@ export default function Login() {
       }
 
       const data = await res.json();
+
+      const result = await fetch("http://localhost:8000/username", {
+        method : 'GET',
+        headers : {
+          'Authorization' : `Bearer ${data.access_token}`
+        }
+      });
+        
+      const username_res = await result.json();
+
+      console.log(username_res)
+      setUsername(username_res.username);
+      localStorage.setItem("username", username_res.username);
+      console.log(username_res.username)
+      
 
       // Store token
       localStorage.setItem("access_token", data.access_token);
