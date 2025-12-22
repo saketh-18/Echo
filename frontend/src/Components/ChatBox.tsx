@@ -120,7 +120,18 @@ export default function ChatBox({
     time_stamp : string
 }
 function ChatBubble({ msg }: { msg: Message }) {
+  const isSystem = msg.type === "system";
   const isYou = msg.sender === "you";
+
+  if (isSystem) {
+    return (
+      <div className="w-full flex justify-center animate-[fadeUp_0.3s_ease-out]">
+        <div className="rounded-full bg-surface/40 px-4 py-1 text-xs text-text-main/60 italic">
+          {msg.contents}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

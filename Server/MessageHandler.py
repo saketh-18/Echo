@@ -7,6 +7,7 @@ from ConnectionStore import connection_store
 from database.session import get_db
 from services import connection_service
 from services.message_service import MessageService
+from services.connection_service import ConnectionService
 
 class MessageHandler:
     def __init__(self, matcher):
@@ -119,13 +120,14 @@ class MessageHandler:
             user_b_id = session_b["uid"]
 
             # writing to db
-            async with get_db() as db:
-                from services.connection_service import ConnectionService
+            connection = None
+            async for db in get_db():
                 connection = await ConnectionService.create_connection(
                     db,
                     user_a_id,
                     user_b_id
                 )
+                break
 
             await websocket.send_json({
                 "type": "system",

@@ -13,14 +13,16 @@ import { pairedStore } from "@/stores/paired-store";
 import { uiStateStore } from "@/stores/uiState-store";
 import { usernameStore } from "@/stores/user-store";
 import React, { FormEvent, useEffect, useState } from "react";
-
+import Swal from 'sweetalert2';
 
 export default function Page() {
   // const [messages, setMessages] = useState<Message[]>([]);
   const [currentMsg, setCurrentMsg] = useState("");
   const [ws, setWs] = useState<WebSocket | null>();
   const [savedWs, setSavedWs] = useState<WebSocket | null>(null);
-  const [activeSavedConnectionId, setActiveSavedConnectionId] = useState<string | null>(null);
+  const [activeSavedConnectionId, setActiveSavedConnectionId] = useState<
+    string | null
+  >(null);
 
   // const [pairedTo, setPairedTo] = useState("");
   const pairedTo = pairedStore((state) => state.pairedTo);
@@ -37,34 +39,91 @@ export default function Page() {
     if (uiState !== "searching") return;
     if (ws && ws.readyState === WebSocket.OPEN) return;
 
+    const access_token =
+      typeof window !== "undefined"
+        ? localStorage.getItem("access_token")
+        : null;
+    const tokenParam = access_token
+      ? `&token=${encodeURIComponent(access_token)}`
+      : "";
+
     const socket = new WebSocket(
-      `ws://localhost:8000/ws?username=${username}&mode=random`
+      `ws://localhost:8000/ws?username=${encodeURIComponent(
+        username
+      )}&mode=random${tokenParam}`
     );
 
     socket.onopen = () => setWs(socket);
 
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
-
       console.log(data);
 
+      // legacy system wrapper
       if (data.system) {
         if (data.paired_to) {
           setPairedTo(data.paired_to);
           setUiState("found");
-
-          setTimeout(() => {
-            setUiState("chatting");
-          }, 1000);
+          setTimeout(() => setUiState("chatting"), 1000);
         }
       }
 
-      if (
-        data.type === "system" &&
-        data.data.action &&
-        data.data.action === "got_skipped"
-      ) {
-        setUiState("got_skipped");
+      if (data.type === "system") {
+        const action = data.data?.action;
+
+        // Partner got skipped
+        if (action === "got_skipped") {
+          setUiState("got_skipped");
+        }
+
+        // Incoming save request: prompt the user to accept/reject
+        if (action === "save_request") {
+          Swal.fire({
+            title: "Save Chat?",
+            text:
+              data.data?.message || "Partner wants to save this chat. Accept?",
+            icon: "question",
+            showCancelButton: true,
+            confirmButtonColor: "#3085d6",
+            cancelButtonColor: "#d33",
+            confirmButtonText: "Yes, accept!",
+            cancelButtonText: "Decline",
+            // Ensures the user can't accidentally close it by clicking outside
+            allowOutsideClick: false,
+          }).then((result) => {
+            if (result.isConfirmed) {
+              // Send save_accept back to server
+              socket.send(
+                JSON.stringify({
+                  type: "system",
+                  data: { action: "save_accept" },
+                })
+              );
+
+              // Optional: Show a small success toast after accepting
+              Swal.fire({
+                title: "Accepted!",
+                text: "The chat will be saved.",
+                icon: "success",
+                timer: 1500,
+                showConfirmButton: false,
+              });
+            }
+          });
+        }
+
+        // Show any system message text inside the chat stream
+        if (data.data?.message) {
+          setMessages({
+            type: "system",
+            contents: data.data.message,
+            sender: "system",
+            time_stamp: new Date().toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+          });
+        }
       }
 
       if (data.type === "chat") {
@@ -98,12 +157,49 @@ export default function Page() {
     };
   }, []);
 
+  function saveChatHandler() {
+    // Only makes sense in live random chat mode
+    if (uiState !== "chatting") return;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+    const access_token =
+      typeof window !== "undefined"
+        ? localStorage.getItem("access_token")
+        : null;
+    if (!access_token) {
+      // notify user to login to save chats
+      setMessages({
+        type: "system",
+        contents: "You need to login to save chats",
+        sender: "system",
+        time_stamp: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      });
+      return;
+    }
+
+    ws.send(
+      JSON.stringify({
+        type: "system",
+        data: {
+          action: "save_request",
+        },
+      })
+    );
+  }
+
   function sendMessage(e: FormEvent) {
     e.preventDefault();
     if (!currentMsg.trim()) return;
 
     if (uiState === "saved_chat") {
-      if (!savedWs || savedWs.readyState !== WebSocket.OPEN || !activeSavedConnectionId) {
+      if (
+        !savedWs ||
+        savedWs.readyState !== WebSocket.OPEN ||
+        !activeSavedConnectionId
+      ) {
         return;
       }
 
@@ -142,17 +238,17 @@ export default function Page() {
   }
 
   function skipHandler() {
-    if(uiState === "chatting") {
-    ws?.send(
-      JSON.stringify({
-        type: "system",
-        data: {
-          action: "skip",
-        },
-      })
-    );
-    setUiState("searching"); 
-  }
+    if (uiState === "chatting") {
+      ws?.send(
+        JSON.stringify({
+          type: "system",
+          data: {
+            action: "skip",
+          },
+        })
+      );
+      setUiState("searching");
+    }
   }
 
   return (
@@ -192,27 +288,31 @@ export default function Page() {
                 >
                   Skip
                 </button>
-                <button className="rounded-full bg-surface-highlight p-4 shadow-sm hover:shadow-accent border-1 border-surface-highlight">
+                <button
+                  onClick={saveChatHandler}
+                  className="rounded-full bg-surface-highlight p-4 shadow-sm hover:shadow-accent border-1 border-surface-highlight"
+                >
                   Save Chat
                 </button>
               </>
             )}
-            {
-              uiState === "saved_chat" && 
+            {uiState === "saved_chat" && (
               <button
-                  onClick={() => {
-                    // Leaving saved chat: close websocket and clear messages
-                    if (savedWs) {
-                      savedWs.close();
-                      setSavedWs(null);
-                      setActiveSavedConnectionId(null);
-                    }
-                    setMessages([]);
-                    setUiState("form");
-                  }}
-                  className="rounded-full bg-surface-highlight p-4 shadow-sm hover:shadow-accent border-1 border-surface-highlight"
-                >Random Chat</button>
-            }
+                onClick={() => {
+                  // Leaving saved chat: close websocket and clear messages
+                  if (savedWs) {
+                    savedWs.close();
+                    setSavedWs(null);
+                    setActiveSavedConnectionId(null);
+                  }
+                  setMessages([]);
+                  setUiState("form");
+                }}
+                className="rounded-full bg-surface-highlight p-4 shadow-sm hover:shadow-accent border-1 border-surface-highlight"
+              >
+                Random Chat
+              </button>
+            )}
           </div>
         </div>
         {/* ================= CHAT ROOM ================= */}
