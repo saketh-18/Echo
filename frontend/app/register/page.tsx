@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Navbar from "../../src/components/Navbar";
+import Navbar from "@components/Navbar";
 
 export default function Register() {
   const router = useRouter();
