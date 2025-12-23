@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Alert } from "../utils/alert";
-import { messageStore } from "../../stores/message-store";
-import { uiStateStore } from "../../stores/uiState-store";
-import { pairedStore } from "../../stores/paired-store";
-import { loginStore } from "../../stores/login-store";
+import { messageStore } from "@/stores/message-store";
+import { uiStateStore } from "@/stores/uiState-store";
+import { pairedStore } from "@/stores/paired-store";
+import { loginStore } from "@/stores/login-store";
 
 export const useChatSocket = (username: string, interests: string) => {
   const [randomWs, setRandomWs] = useState<WebSocket | null>(null);

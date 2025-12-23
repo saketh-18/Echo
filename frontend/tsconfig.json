@@ -20,8 +20,9 @@
     ],
     "paths": {
       "@/*": ["./*"],
-      "@components/*": ["./src/components/*"],
-      "@stores/*": ["./src/stores/*"]
+      "@stores/*": ["./stores/*"],
+      "@components/*": ["./app/src/components/*"],
+      "@src/*": ["./app/src/*"]
     }
   },
   "include": [

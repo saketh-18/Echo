@@ -1,7 +1,7 @@
 "use client";
 
-import { uiStateStore } from "../../stores/uiState-store";
-import { usernameStore } from "../../stores/user-store";
+import { uiStateStore } from "@/stores/uiState-store";
+import { usernameStore } from "@/stores/user-store";
 import React from "react";
 
 export default function Form() {

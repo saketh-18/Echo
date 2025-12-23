@@ -1,7 +1,7 @@
 "use client";
 
-import { loginStore } from "../../stores/login-store";
-import { usernameStore } from "../../stores/user-store";
+import { loginStore } from "@/stores/login-store";
+import { usernameStore } from "@/stores/user-store";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 

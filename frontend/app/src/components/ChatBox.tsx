@@ -1,4 +1,4 @@
-import { messageStore } from "../../stores/message-store";
+import { messageStore } from "@/stores/message-store";
 import React, { useLayoutEffect, useRef } from "react";
 
 // interface Message {
