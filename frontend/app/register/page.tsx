@@ -42,6 +42,7 @@ export default function Register() {
 
       // Redirect to login after successful register
       router.push("/login");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       setError(err.message || "Something went wrong");
     } finally {

@@ -150,10 +150,8 @@ export const useChatSocket = (username: string, interests: string) => {
       if (randomWsRef.current === socket) randomWsRef.current = null;
       setRandomWs(null);
       // If we were chatting, the close likely means partner disconnected
-      if (uiState === "chatting") {
+      if (uiState !== "searching") {
         setUiState("got_skipped");
-      } else if (uiState === "saved_chat") {
-        setUiState("form");
       }
     };
 

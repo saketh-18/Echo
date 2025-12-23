@@ -62,6 +62,7 @@ export default function Login() {
       router.push("/chat");
       console.log("Login successful");
       setIsLoggedIn(true);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       setError(err.message || "Something went wrong");
     } finally {

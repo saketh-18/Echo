@@ -39,6 +39,7 @@ export default function SavedChats({ onSavedChatOpen }: SavedChatsProps) {
     if (res.ok) {
       const rawMessages = await res.json();
       console.log(rawMessages);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const cleanedMessages = rawMessages.map((msg: any) => ({
         type: "chat",
         contents: msg.contents,
@@ -125,6 +126,7 @@ export default function SavedChats({ onSavedChatOpen }: SavedChatsProps) {
       }
     }
     fetchChats();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedIn]);
 
   return (
