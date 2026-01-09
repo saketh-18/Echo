@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy import or_, select
 from database.session import get_db
@@ -16,7 +16,13 @@ router = APIRouter();
 
 @router.get("/connections")
 async def get_connections(payload: dict = Depends(get_token_payload), db: AsyncSession = Depends(get_db)):
-    user_id = uuid.UUID(payload.get("sub"))
+    if payload is None:
+        raise HTTPException(status_code=401, detail="Invalid or missing token")
+    
+    try:
+        user_id = uuid.UUID(payload.get("sub"))
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=401, detail="Invalid token payload")
     
     # We create an alias for the User table to represent the "other person"
     OtherUser = aliased(models.user.User)

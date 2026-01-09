@@ -1,3 +1,4 @@
+from tkinter import NO
 from fastapi import Depends, FastAPI, WebSocket, WebSocketDisconnect
 import json
 import logging
@@ -20,7 +21,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from routers.auth import decode_fastapi_users_jwt, fastapi_users, auth_backend, UserRead, UserCreate, get_token_payload
 from fastapi.middleware.cors import CORSMiddleware
 
-origins = ["http://localhost:3000", "https://echo-six-mocha.vercel.app"]
+origins = [
+    "http://localhost:3000",
+]
 
 app = FastAPI()
 
@@ -37,7 +40,7 @@ on_test = True
 # logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
 # logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 
-# This automatically creates /auth/jwt/login and /auth/jwt/logout
+
 app.include_router(
     fastapi_users.get_auth_router(auth_backend),
     prefix="/auth",
@@ -106,221 +109,128 @@ async def websocket_handler(websocket : WebSocket):
     user_id = None
     token = websocket.query_params.get("token");
     
+    # heartbeat_state = {"last_pong" : time.time()};
+    # heartbeat_task = asyncio.create_task(heartbeat(websocket, heartbeat_state));
+    
+    username = websocket.query_params.get("username");                    
+    state.matcher.username_map[websocket] = username
+    """ AUTHENTICATION """
+     
     if token:
         print(f"Token received: {token[:20]}...")  # Log first 20 chars for debugging
         payload = decode_fastapi_users_jwt(token)
         if payload:
-            is_authorized = True
             user_id = payload.get("sub")
-            print(f"JWT decoded successfully. User ID: {user_id}, Payload keys: {list(payload.keys())}")
+            print(f"JWT decoded successfully. User ID: {user_id}, Payload keys: {list(payload.keys())}");
+            await websocket.send_json({
+                "type" : "auth-confirm",
+                "isLoggedIn" : "true"
+            });
         else:
-            print(f"JWT decode failed for token: {token[:20]}...")
+            print(f"JWT decode failed for token: {token[:20]}...");
+            await websocket.send_json({
+                "type" : "auth-confirm",
+                "isLoggedIn" : "false"
+            })
     else:
         print("No token provided in query params")
-            
+        await websocket.send_json({
+                "type" : "auth-confirm",
+                "isLoggedIn" : "false"
+            })
+    
+    # mode = websocket.query_params.get("mode");
+    # connection_id = websocket.query_params.get("connection_id");
     
     if user_id:
         # Convert user_id to UUID for consistent dictionary key format
         try:
             user_id_uuid_key = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
             state.matcher.active_users[user_id_uuid_key] = websocket # setting user is active
+            state.connection_store.sessions[websocket] = {
+                "uid": user_id_uuid_key, 
+                "is_authenticated": True,
+                "username": username,
+            }
+            is_authorized = True
         except (ValueError, TypeError):
             # If conversion fails, use string as fallback
             state.matcher.active_users[user_id] = websocket
     
-    mode = websocket.query_params.get("mode");
-    connection_id = websocket.query_params.get("connection_id");
     
-    heartbeat_state = {"last_pong" : time.time()};
-    heartbeat_task = asyncio.create_task(heartbeat(websocket, heartbeat_state));
-    
-    username = websocket.query_params.get("username");
-    interests = websocket.query_params.get("interests", "");
-    
-    
-    state.matcher.username_map[websocket] = username; 
-    
-    try:
-        #  ========================
-        # >>> SAVED CHATS MESSAGING LOGIC
-        #  ========================
-        
-        if mode == "saved":
-            # must be authenticated
-            if not is_authorized or not connection_id:
-                await websocket.send_json({
-                    "type": "error",
-                    "message": "Authentication required and connection_id must be provided for saved mode",
-                    "is_authenticated": is_authorized,
-                    "connection_id": connection_id,
-                })
-                await websocket.close(code=1008, reason="Missing authentication or connection_id")
-                return
-
-            try:
-                connection_id_uuid = uuid.UUID(connection_id)
-            except (ValueError, TypeError) as e:
-                await websocket.send_json({
-                    "type": "error", 
-                    "data" : {
-                    "message": f"Invalid connection_id format: {str(e)}"
-                }})
-                await websocket.close(code=1008, reason="Invalid connection_id")
-                return
-
-            # FIX: Use the generator correctly to get the session
-            # Convert user_id string to UUID object
-            try:
-                user_id_uuid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
-            except (ValueError, TypeError) as e:
-                await websocket.send_json({
-                    "type": "error",
-                    "data" : {
-                    "message": f"Invalid user_id format: {str(e)}"
-                }})
-                await websocket.close(code=1008, reason="Invalid user_id")
-                return
-
-            other_user = None
-            async for db in get_db(): 
-                other_user = await MessageService.get_other_user_id(
-                    db,
-                    connection_id_uuid,
-                    user_id_uuid
-                )
-                # We only need the ID, so we can break after getting it
-                break 
-
-            if not other_user:
-                await websocket.send_json({
-                    "type": "error",
-                    "data" : {
-                    "message": "Connection not found or you don't have access to this connection"
-                }})
-                await websocket.close(code=1008, reason="Connection not found")
-                return
-
-            # Register session and start listening...
-            # Store user_id as UUID for consistency with database operations
-            state.connection_store.sessions[websocket] = {
-                "uid": user_id_uuid,  # Store as UUID object, not string
-                "is_authenticated": True,
-                "username": username,
-                "active_connection_id": str(connection_id_uuid),
+    # state.matcher.username_map[websocket] = username; 
+    async def start_matching(websocket, interests : str = ""):
+        user = {
+                "socket" : websocket,
+                "username" : username,
+                "interests": [i.strip().lower() for i in interests.split(',') if i.strip()],
+                "uid": payload["sub"] if payload else None,
             }
-            
-            await state.messenger.send_saved_chat_confirmation(websocket, other_user)
-
-            try:
-                while True:
-                    data = await websocket.receive_json()
-                    msg_type = data.get("type")
-
-                    if msg_type == "chat":
-                        await state.messenger.handle_chat(websocket, data)
-                    elif msg_type == "typing":
-                        await state.messenger.handle_typing(websocket, data)
-
-            except WebSocketDisconnect:
-                state.matcher.active_users.pop(user_id, None)
-
-            finally:
-                heartbeat_task.cancel()
-                try:
-                    await heartbeat_task
-                except asyncio.CancelledError:
-                    pass
-                await state.messenger.cleanup(websocket, skipped=False)
-
-            return
         
-        #  ========================
-        # >>> RANDOM MATCHING LOGIC
-        #  ========================
+        state.connection_store.sessions[websocket] = {
+                                "uid": payload["sub"] if payload else None,
+                                "is_authenticated": is_authorized,
+                                "username": username,
+                            }
+        matched, user1, user2, based_on = await state.matcher.try_match(user)
         
-        while True: # this loop runs from matching to websocket termination
-            # Match -> Listen for messages -> cleanup -> start again if skipped -> terminate websocket
-            if mode == "random": 
-                matched = False;
-                user1 = None
-                user2 = None
-                based_on = []
-                skipped = False;
-                
-                user = {
-                    "socket" : websocket,
-                    "username" : username,
-                    "interests": [i.strip().lower() for i in interests.split(',') if i.strip()],
-                    "uid": payload["sub"] if payload else None,
-                    }
-                
-                state.connection_store.sessions[websocket] = {
-                    "uid": payload["sub"] if payload else None,
-                    "is_authenticated": is_authorized,
-                    "username": username,
-                }
-
-                matched, user1, user2, based_on = await state.matcher.try_match(user)
-                
-                if matched:
-                    print("matched!!", based_on);
-                    await state.matcher.confirm_connection(user1, user2, based_on);
-                else:
-                    await websocket.send_json({"system" : "waiting for a partner..."});
-            
-            try:
-                while True:
-                    data = await websocket.receive_json();
-                    msg_type = data.get("type");
                     
-                    if msg_type == "chat":
-                        await state.messenger.handle_chat(websocket, data);
-                    elif msg_type == "system":
-                        skipped = await state.messenger.handle_system(websocket, data);
-                        if skipped:
-                            break;
-                    elif msg_type == "typing":
-                        await state.messenger.handle_typing(websocket, data);
-                    
-            except WebSocketDisconnect:
-                pass;
-
-            # control reaches here when user skips
-            await state.messenger.cleanup(websocket, skipped);
-            if skipped:
-                continue;
-            else:
-                break;
-            
-        heartbeat_task.cancel();
-        try:
-            await heartbeat_task        
-        except asyncio.CancelledError:
-            pass
-        
-    except WebSocketDisconnect:
-        # Normal disconnect, no need to send error
-        pass
-    except Exception as e:
-        import traceback
-        error_msg = f"Server error: {str(e)}"
-        print(f"WebSocket error: {e}")
-        print(traceback.format_exc())
-        try:
+        if matched:
+            await state.matcher.confirm_connection(user1, user2, based_on)
+        else:
             await websocket.send_json({
-                "type": "error",
-                "message": error_msg
+                "type": "system",
+                "data": { "message": "Waiting for a partner..." }
             })
-            await websocket.close(code=1011, reason="Internal server error")
-        except:
-            pass  # Connection already closed
-        finally:
-            heartbeat_task.cancel()
-            try:
-                await heartbeat_task
-            except asyncio.CancelledError:
-                pass
-            
+
+    
+    # Fetched from first message
+    while True:
+        skipped = False
+        try:
+            while True:
+                data = await websocket.receive_json();
+                msg_type = data.get("type")
+                #  ========================
+                # >>> RANDOM MATCHING LOGIC
+                #  ========================
+                if (msg_type == "random"):
+                    interests = data.get("interests", "")
+                    await start_matching(websocket, interests)
+                elif msg_type == "chat":
+                    if data["context"] == "saved":
+                        if not is_authorized:
+                           await websocket.send_json({
+                                "type" : "system",
+                                "data" : {
+                                    "message" : "you need to be logged in to chat with saved chats"
+                                }
+                            })
+                    await state.messenger.handle_chat(websocket, data)
+                elif msg_type == "system":
+                    skipped = await state.messenger.handle_system(websocket, data);
+                    print(skipped)
+                    if skipped:
+                        break;
+        except WebSocketDisconnect:
+            await state.messenger.cleanup(websocket, skipped)
+            break
+            # Inner loop broken - perform cleanup
+        await state.messenger.cleanup(websocket, skipped);
+        
+        if skipped:
+            print(
+                'outer', skipped
+            )
+            await start_matching(websocket)
+            continue
+            # If skipped, stay in outer loop to allow re-matching, otherwise exit
+        if not skipped:
+            break;
+                
+        
+
+                
 
 
 

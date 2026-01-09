@@ -7,8 +7,8 @@ class MatchHandler:
         self.rooms = {};
         self.user_to_rooms = {};
         self.lock = asyncio.Lock();
-        self.username_map = {};
-        self.active_users = {} # map uuid to websocket
+        self.username_map = {}; # websocket to username map for all users
+        self.active_users = {} # map uuid to websocket for logged in users
         
         
     def get_partner(self, room_id, websocket):
@@ -72,8 +72,8 @@ class MatchHandler:
             based_on = ["random"];
         # print(based_on);
         try:
-            await user1["socket"].send_json({"system": "Connected", "paired_to" : user2["username"] , "based_on": ','.join(based_on)})
-            await user2["socket"].send_json({"system": "Connected", "paired_to" : user1["username"] , "based_on": ','.join(based_on)})
+            await user1["socket"].send_json({"type": "connected", "paired_to" : user2["username"] , "based_on": ','.join(based_on)})
+            await user2["socket"].send_json({"type": "connected", "paired_to" : user1["username"] , "based_on": ','.join(based_on)})
         except Exception as e:
             # If sending fails, cleanup the connection
             async with self.lock:

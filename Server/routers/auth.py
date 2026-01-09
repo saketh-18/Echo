@@ -61,10 +61,14 @@ fastapi_users = FastAPIUsers[User, uuid.UUID](
 security = HTTPBearer(auto_error=False)
 
 def get_token_payload(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict | None:
-    
+    """
+    Extract and validate JWT token from Bearer credentials.
+    Returns the decoded payload or None if credentials are missing/invalid.
+    """
     
     if credentials is None:
         return None
+    
     token = credentials.credentials
     
     try:
@@ -76,8 +80,23 @@ def get_token_payload(credentials: HTTPAuthorizationCredentials = Depends(securi
         # 2. Return the raw payload (e.g., {'sub': 'uuid...', 'exp': ...})
         return payload
         
-    except (jwt.ExpiredSignatureError, jwt.PyJWTError):
-        # OPTION A: If they send a BAD token, treat them as anonymous (return None)
+    except jwt.ExpiredSignatureError:
+        # Token has expired
+        return None
+    except jwt.InvalidAudienceError:
+        # Try without audience verification
+        try:
+            payload = jwt.decode(
+                token, 
+                SECRET, 
+                algorithms=["HS256"],
+                options={"verify_aud": False}
+            )
+            return payload
+        except (jwt.ExpiredSignatureError, jwt.PyJWTError):
+            return None
+    except jwt.PyJWTError:
+        # Invalid token signature or format
         return None
     
 

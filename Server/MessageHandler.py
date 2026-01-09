@@ -1,4 +1,6 @@
 from datetime import datetime, timezone
+from email import message
+import queue
 import uuid
 import traceback
 
@@ -14,43 +16,49 @@ class MessageHandler:
         self.matcher = matcher
         
     async def handle_chat(self, websocket, data):
+        # print("send message called")
         context = data.get("context")
 
         if context == "saved":
             await self.handle_saved_chat(websocket, data)
-            return
-        
-        room_id = self.matcher.user_to_rooms.get(websocket)
-        if not room_id:
-            # Room doesn't exist, user should go back to matching
-            return
-            
-        receiver = self.matcher.get_partner(room_id, websocket)
-        if not receiver:
-            # Partner not found, cleanup and return to matching
-            await self.cleanup(websocket, True);
-            return
-            
-        # Send message to receiver
-        try:
-            await receiver.send_json({
-                "type" : "chat",
-                "data" : {
-                    "message" : data.get("data", {}).get("message")
+        elif context == "global":
+            await self.handle_global_chat(websocket,data)
+        else:
+            room_id = self.matcher.user_to_rooms.get(websocket)
+            if not room_id:
+                print("room id not found")
+                # Room doesn't exist, user should go back to matching
+                return
+                
+            receiver = self.matcher.get_partner(room_id, websocket)
+            if not receiver:
+                print("receiver not found")
+                # Partner not found, cleanup and return to matching
+                await self.cleanup(websocket, True);
+                return
+                
+            # Send message to receiver
+            try:
+                await receiver.send_json({
+                    "type": "chat",
+                    "context": data.get("context", "random"),
+                    "data": {
+                        "message": data.get("data", {}).get("message"),
+                        "timestamp": datetime.now().isoformat(),
+                        "sender": self.matcher.username_map.get(websocket, "Unknown"),
                     },
-                "time_stamp" : str(datetime.now()),
-                "sender" : self.matcher.username_map.get(websocket, "Unknown")
-            })
-        except WebSocketDisconnect:
-            self.cleanup(websocket, False)
-        except RuntimeError:
-            self.cleanup(websocket, False)
-        except Exception as e:
-            # If sending fails, partner might have disconnected
-            print(f"Error sending message: {e}")
-            await self.cleanup(websocket, False);
+                })
+            except WebSocketDisconnect:
+                await self.cleanup(websocket, False)
+            except RuntimeError:
+                await self.cleanup(websocket, False)
+            except Exception as e:
+                # If sending fails, partner might have disconnected
+                print(f"Error sending message: {e}")
+                await self.cleanup(websocket, False);
                 
     async def handle_system(self, websocket, data):
+        print("handle system called")
         room_id = self.matcher.user_to_rooms.get(websocket)
         sender = self.matcher.username_map[websocket];
         receiver = self.matcher.get_partner(room_id, websocket) if room_id else None
@@ -61,7 +69,7 @@ class MessageHandler:
             if room_id:
                 if receiver:
                     await receiver.send_json({
-                        "type":"system",
+                        "type":"skip",
                         "data" : {
                             "message" : "Partner Disconnected, start a new chat or exit the app",
                             "action" : "got_skipped"
@@ -69,6 +77,7 @@ class MessageHandler:
                     })
             return True;
         if action == "save_request":
+            print("handle save request called")
             if receiver:
                 receiver_username = self.matcher.username_map[receiver];
                 connection = connection_store.create_request(room_id, sender, receiver_username);
@@ -136,7 +145,7 @@ class MessageHandler:
                     "connection_id": str(connection.id)
                 }
             })
-            await receiver.send_json({
+            await receiver.send_json({ 
                 "type": "system",
                 "data": {
                     "message": "Chat saved successfully",
@@ -165,7 +174,7 @@ class MessageHandler:
                 self.matcher.rooms.pop(room_id, None)
                 self.matcher.user_to_rooms.pop(partner, None)
                 try:
-                    await partner.send_json({"type" : "system",
+                    await partner.send_json({"type" : "skip",
                                              "data" : {
                                                  "message" : "Partner disconnected",
                                                  "action" : "got_skipped"
@@ -259,7 +268,9 @@ class MessageHandler:
                         "message": message,
                         "sender": session["username"],
                         "timestamp": datetime.now().isoformat()
-                    }
+                        
+                    },
+                    
                 })
             else:
                 # Receiver is not online, send confirmation to sender
@@ -278,6 +289,32 @@ class MessageHandler:
                 "data" : {
                 "message": f"Failed to send message: {str(e)}"
             }})
+            
+    async def handle_global_chat(self, websocket, data):
+        message = data.get("data", {}).get("message")
+        
+        username = self.matcher.username_map.get(websocket);
+        if not username:
+            print("global", message)
+            await self.cleanup(websocket, False)
+            return ;
+        for ws, us in list(self.matcher.username_map.items()):
+            if ws == websocket:
+                continue
+            try:
+                print(f"Sending global message to {us}")
+                await ws.send_json({
+                    "type": "chat",
+                    "context" : "global",
+                    "data" : {
+                        "message" : message,
+                        "sender" : username,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                })
+            except Exception as e:
+                print(f"Error sending Global message: {e}")
+                
 
     async def send_saved_chat_confirmation(self, websocket, receiver_id):
         receiver_websocket = self.matcher.active_users.get(receiver_id)

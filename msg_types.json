@@ -1,0 +1,21 @@
+{"for random chat" : {
+    "type": "random",
+    "use" : "to start a random chat"
+}
+,
+"for chat" : {
+    "type": "chat",
+    "context" : "saved | global (not required for random chats)",
+    "data" : {
+        "message" : "contents"
+    }
+},
+"system messages" : {
+    "type" : "system",
+    "action":  "skip | save_request | save_accept ",
+    "data" : {
+        "message" : "contents",
+        "optional" : "data is optional"
+    }
+}
+}
