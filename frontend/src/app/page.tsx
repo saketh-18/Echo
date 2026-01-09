@@ -27,7 +27,10 @@ export default function Home() {
     wakeUpRender();
   }, []);
 
-  const token = localStorage.getItem("token") ?? ""
+  let token = "";
+  useEffect(() => {
+    token = localStorage.getItem("token") ?? "";
+  }, []);
   console.log("tokenn", token);
   const params = new URLSearchParams();
   params.set("token", token);

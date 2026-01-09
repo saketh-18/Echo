@@ -21,6 +21,7 @@ import React, { useCallback, useEffect, useState } from "react";
 
 export default function page() {
   const [activeTab, setActiveTab] = useState<"global" | "friends">("global");
+  const [token, setToken] = useState("");
   const uiState = uiStateStore((state) => state.uiState);
   const messageState = messageStateStore();
   const pairedTo = pairedToStore((state) => state.pairedTo);
@@ -42,7 +43,13 @@ export default function page() {
   const username = usernameStore((state) => state.username);
   const wsBase = process.env.NEXT_PUBLIC_WS_URL ?? "";
   const apiBase = process.env.NEXT_PUBLIC_API_URL;
-  const token = localStorage.getItem("token") ?? "";
+
+  // Load token from localStorage on client mount
+  useEffect(() => {
+    const storedToken = localStorage.getItem("token") ?? "";
+    setToken(storedToken);
+  }, []);
+
   const params = new URLSearchParams();
   params.set("token", token);
   params.set("username", username);
@@ -156,16 +163,22 @@ export default function page() {
                 <div className="flex h-full flex-col px-6">
                   {isLoggedIn && !activeConnection.isActive && <Connections />}
                   {activeConnection.isActive &&
-                    activeConnection.activeConnectionId.length > 0 && (() => {
-                      const connections = connectionStore.getState().connections;
+                    activeConnection.activeConnectionId.length > 0 &&
+                    (() => {
+                      const connections =
+                        connectionStore.getState().connections;
                       const friendName = connections.find(
-                        (c) => c.connection_id === activeConnection.activeConnectionId
+                        (c) =>
+                          c.connection_id ===
+                          activeConnection.activeConnectionId
                       )?.username;
                       return (
                         <>
                           <ChatHeader
                             name={friendName}
-                            onBack={() => activeConnection.clearActiveConnection()}
+                            onBack={() =>
+                              activeConnection.clearActiveConnection()
+                            }
                           />
                           <div className="flex-1">
                             <ChatBox

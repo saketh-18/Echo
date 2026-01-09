@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import { LoginStore } from "@/stores/login-store";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -15,10 +14,10 @@ import { usernameStore } from "@/stores/username-store";
 export default function Navbar() {
   const isLoggedIn = LoginStore((state) => state.isLoggedIn);
   const setIsLoggedIn = LoginStore((state) => state.setIsLoggedIn);
-  const router = useRouter();
   const username = usernameStore((state) => state.username);
   const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "";
-
+  const router = useRouter();
+  
   async function logout() {
     const access_token = localStorage.getItem("token");
     const res = await fetch(`${apiBase}/auth/logout`, {
