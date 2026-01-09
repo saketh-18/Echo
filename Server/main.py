@@ -1,23 +1,14 @@
-from tkinter import NO
-from fastapi import Depends, FastAPI, WebSocket, WebSocketDisconnect
-import json
-import logging
-from datetime import datetime
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 import uuid
 import asyncio
 import time
 from routers import test
 from routers import username
-from services.message_service import MessageService
 from routers import messages
 from routers import connections
-from database.session import get_db
 from core.state import state
 import asyncio
 from core.state import state
-from database.models.user import User
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 from routers.auth import decode_fastapi_users_jwt, fastapi_users, auth_backend, UserRead, UserCreate, get_token_payload
 from fastapi.middleware.cors import CORSMiddleware
 
