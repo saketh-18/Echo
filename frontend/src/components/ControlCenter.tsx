@@ -4,12 +4,17 @@ import { apiClient } from "@/api/client";
 import { authStore } from "@/stores/auth-store";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import React from "react";
+import React, { useEffect, useState } from "react";
 
 export default function ControlCenter() {
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
   const isLoggedIn = authStore((s) => s.isLoggedIn);
   const setIsLoggedIn = authStore((s) => s.setIsLoggedIn);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   async function logout() {
     const res = await apiClient("auth/logout", {
@@ -21,6 +26,12 @@ export default function ControlCenter() {
       router.push("/login");
     }
   }
+
+  // Don't render auth buttons until hydrated
+  if (!mounted) {
+    return <div className="flex gap-4 items-center h-8" />;
+  }
+
   return (
     <div className="flex gap-4 items-center">
       {!isLoggedIn ? (

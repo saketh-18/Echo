@@ -20,9 +20,12 @@ import ActiveConnectionChat from "@/components/connections/ActiveConnectionChat"
 export default function page() {
   const [activeTab, setActiveTab] = useState<"global" | "friends">("global");
   const uiState = uiStateStore((state) => state.uiState);
-  const messageState = messageStateStore();
+  const globalMessages = messageStateStore((state) => state.global);
+  const setGlobal = messageStateStore((state) => state.setGlobal);
+  const randomMessages = messageStateStore((state) => state.random);
+  const setRandom = messageStateStore((state) => state.setRandom);
   const isLoggedIn = authStore((state) => state.isLoggedIn);
-  const activeConnection = activeConnectionStore((state) => state);
+  const isActive = activeConnectionStore((state) => state.isActive);
 
   return (
     <>
@@ -89,16 +92,16 @@ export default function page() {
               {activeTab === "global" && (
                 <div className="h-full">
                   <ChatBox
-                    messages={messageState.global}
+                    messages={globalMessages}
                     context="global"
-                    setMessages={messageState.setGlobal}
+                    setMessages={setGlobal}
                   />
                 </div>
               )}
 
               {activeTab === "friends" && (
                 <div className="flex h-full flex-col px-6">
-                  {isLoggedIn && !activeConnection.isActive && <Connections />}
+                  {isLoggedIn && !isActive && <Connections />}
                   {!isLoggedIn && (
                     <div className="flex items-center justify-center h-full">
                       <p className="p-2 rounded-md bg-accent/10">
@@ -121,9 +124,9 @@ export default function page() {
             <div className="flex-1 overflow-hidden">
               {uiState == "chatting" && (
                 <ChatBox
-                  messages={messageState.random}
+                  messages={randomMessages}
                   context="random"
-                  setMessages={messageState.setRandom}
+                  setMessages={setRandom}
                 />
               )}
               {uiState == "form" && <ChatForm />}
