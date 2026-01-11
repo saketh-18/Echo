@@ -6,6 +6,7 @@ import { uiStateStore } from "@/stores/uiState-store";
 import Navbar from "@/components/Navbar";
 import Link from "next/link";
 import { authStore } from "@/stores/auth-store";
+import { sendWsMessage } from "@/lib/websocket/actions";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -38,8 +39,15 @@ export default function Login() {
       if (!res.ok) {
         throw new Error("Invalid email or password");
       }
-
+      
+      
       const data = await res.json();
+      sendWsMessage({
+        "type" : "auth_confirm",
+        "data" : {
+          "token" : data.access_token
+        }
+      })
       localStorage.setItem("token", data.access_token);
       const result = await fetch(`${apiBase}/username`, {
         method: "GET",

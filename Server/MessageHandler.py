@@ -117,7 +117,7 @@ class MessageHandler:
                         "message": "Both users must be logged in to save chats"
                     }
                 })
-                await receiver.send_json({
+                await receiver.send_json({ # type: ignore
                     "type": "system",
                     "data": {
                         "message": "Both users must be logged in to save chats"
@@ -142,14 +142,14 @@ class MessageHandler:
                 "type": "system",
                 "data": {
                     "message": "Chat saved successfully",
-                    "connection_id": str(connection.id)
+                    "connection_id": str(connection.id) # pyright: ignore[reportOptionalMemberAccess]
                 }
             })
-            await receiver.send_json({ 
+            await receiver.send_json({  # type: ignore
                 "type": "system",
                 "data": {
                     "message": "Chat saved successfully",
-                    "connection_id": str(connection.id)
+                    "connection_id": str(connection.id) # type: ignore
                 }
             })        
     
@@ -166,6 +166,12 @@ class MessageHandler:
             })
             
     async def cleanup(self, websocket, skipped):
+        """Cleanup and broadcast offline status when user disconnects"""
+        # Get user info before cleanup
+        session = self.matcher.connection_store.sessions.get(websocket)
+        user_id = session.get("uid") if session else None
+        username = session.get("username") if session else None
+        
         async with self.matcher.lock:
             self.matcher.queue[:] = [u for u in self.matcher.queue if u["socket"] != websocket]
             room_id = self.matcher.user_to_rooms.pop(websocket, None)
@@ -181,8 +187,20 @@ class MessageHandler:
                                                  }})
                 except:
                     pass
-            if skipped:
-                return True;
+            
+            # Remove from active users
+            if user_id:
+                self.matcher.active_users.pop(user_id, None)
+            
+            # Remove session
+            self.matcher.connection_store.sessions.pop(websocket, None)
+            
+        # Broadcast offline status to others
+        if user_id and username:
+            await self.broadcast_online_status(user_id, username, False)
+            
+        if skipped:
+            return True;
 
 
     async def handle_saved_chat(self, websocket, data):
@@ -321,7 +339,7 @@ class MessageHandler:
         if receiver_websocket:
             try:
                 await receiver_websocket.send_json({
-                    "type": "system",
+                    "type": "online_indicator",
                     "data": {
                         "message": "Both users are active, start chatting",
                         "connection_status": "connected"
@@ -345,5 +363,26 @@ class MessageHandler:
                     "connection_status": "offline"
                 }
             })
-    
+    async def broadcast_online_status(self, user_id, username, is_online: bool):
+        """
+        Broadcast online/offline status to all active users who have saved chats with this user.
+        This is called when a user logs in or logs out.
+        """
+        try:
+            # Find all active users and send them the status update
+            for active_user_id, active_ws in list(self.matcher.active_users.items()):
+                try:
+                    await active_ws.send_json({
+                        "type": "online_status",
+                        "data": {
+                            "user_id": str(user_id),
+                            "username": username,
+                            "is_online": is_online
+                        }
+                    })
+                except Exception:
+                    # Silently skip if we can't send to this user
+                    pass
+        except Exception as e:
+            print(f"Error broadcasting online status: {e}")
 

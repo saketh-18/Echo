@@ -14,10 +14,23 @@ export const apiClient = async (url: string, options: RequestInit = {}) => {
     },
   });
 
-  if(!res.ok) {
-    return await res.json();
+  // Check if response has JSON content
+  const contentType = res.headers.get("content-type");
+  let data = null;
+
+  if (contentType?.includes("application/json")) {
+    try {
+      data = await res.json();
+    } catch {
+      // JSON parse failed, but we still have the status code
+      data = null;
+    }
   }
 
-  const data = await res.json();
-  return data;
+  return {
+    ok: res.ok,
+    status: res.status,
+    ...(data && { data }),
+    ...(data && { error: data }),
+  };
 };

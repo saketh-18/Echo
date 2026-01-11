@@ -45,7 +45,7 @@ export const registerSocketEvents = () => {
         loginState.setIsLoggedIn(isLoggedIn);
         storage?.setItem("isLoggedIn", isLoggedIn ? "true" : "false");
         const fetchedConnections = await connectionsRepo.getConnections();
-        connectionStore.getState().setConnections(fetchedConnections);
+        connectionStore.getState().setConnections(fetchedConnections.data);
       } else {
         loginState.setIsLoggedIn(false);
         storage?.setItem("isLoggedIn", "false");
@@ -77,6 +77,18 @@ export const registerSocketEvents = () => {
           sendSaveAccept();
         }
       });
+    } else if (data.type === "online_status") {
+      // Handle online/offline status updates
+      const { username, is_online } = data.data;
+      const connStore = connectionStore.getState();
+
+      if (is_online) {
+        connStore.setUserOnline(username);
+      } else {
+        connStore.setUserOffline(username);
+      }
+      console.log(`User ${username} is now ${is_online ? "online" : "offline"}`);
+    } else if (data.type == "online_indicator") {
     }
   };
 

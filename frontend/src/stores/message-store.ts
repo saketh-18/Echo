@@ -1,6 +1,4 @@
-import {
-  AnyMessage,
-} from "@/types/chat";
+import { AnyMessage } from "@/types/chat";
 import { create } from "zustand";
 
 const initialMsg = {
@@ -21,7 +19,7 @@ interface messageTypes {
   };
   setRandom: (arg: MessageType | MessageType[]) => void;
   setGlobal: (arg: MessageType | MessageType[]) => void;
-  setSaved: (arg: MessageType, arg2: string) => void;
+  setSaved: (arg: MessageType | MessageType[], connectionId: string) => void;
 }
 
 export const messageStateStore = create<messageTypes>()((set) => ({
@@ -42,11 +40,21 @@ export const messageStateStore = create<messageTypes>()((set) => ({
       }
       return { global: [...state.global, arg] };
     }),
-  setSaved: (arg: MessageType, connectionId: string) =>
+  setSaved: (arg: MessageType | MessageType[], connectionId: string) =>
     set((state) => {
       if (!connectionId) {
         return {} as Partial<typeof state>;
       }
+      // If arg is an array, replace all messages for this connection
+      if (Array.isArray(arg)) {
+        return {
+          saved: {
+            ...state.saved,
+            [connectionId]: arg,
+          },
+        };
+      }
+      // If arg is a single message, append it
       const prev = state.saved[connectionId] ?? [];
       return {
         saved: {

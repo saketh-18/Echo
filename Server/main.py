@@ -119,50 +119,49 @@ async def websocket_handler(websocket : WebSocket):
     # username = websocket.query_params.get("username");                    
     # state.matcher.username_map[websocket] = username
     """ AUTHENTICATION """
-     
-    if token:
-        print(f"Token received: {token[:20]}...")  # Log first 20 chars for debugging
-        payload = decode_fastapi_users_jwt(token)
-        if payload:
-            user_id = payload.get("sub")
-            print(f"JWT decoded successfully. User ID: {user_id}, Payload keys: {list(payload.keys())}");
-            await websocket.send_json({
-                "type" : "auth-confirm",
-                "isLoggedIn" : "true"
-            });
+    
+    async def authenticate(websocket, token): 
+        nonlocal user_id, payload, is_authorized
+        if token:
+            print(f"Token received: {token[:20]}...")  # Log first 20 chars for debugging
+            payload = decode_fastapi_users_jwt(token)
+            if payload:
+                user_id = payload.get("sub")
+                print(f"JWT decoded successfully. User ID: {user_id}, Payload keys: {list(payload.keys())}");
+                await websocket.send_json({
+                    "type" : "auth-confirm",
+                    "isLoggedIn" : "true"
+                });
+            else:
+                print(f"JWT decode failed for token: {token[:20]}...");
+                await websocket.send_json({
+                    "type" : "auth-confirm",
+                    "isLoggedIn" : "false"
+                })
         else:
-            print(f"JWT decode failed for token: {token[:20]}...");
+            print("No token provided in query params")
             await websocket.send_json({
-                "type" : "auth-confirm",
-                "isLoggedIn" : "false"
-            })
-    else:
-        print("No token provided in query params")
-        await websocket.send_json({
-                "type" : "auth-confirm",
-                "isLoggedIn" : "false"
-            })
+                    "type" : "auth-confirm",
+                    "isLoggedIn" : "false"
+                })
+            
+        if user_id:
+            # Convert user_id to UUID for consistent dictionary key format
+            try:
+                user_id_uuid_key = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+                state.matcher.active_users[user_id_uuid_key] = websocket # setting user is active
+                state.connection_store.sessions[websocket] = {
+                    "uid": user_id_uuid_key, 
+                    "is_authenticated": True,
+                    # username may arrive later via set_username; set after that message
+                    "username": None,
+                }
+                is_authorized = True
+            except (ValueError, TypeError):
+                # If conversion fails, use string as fallback
+                state.matcher.active_users[user_id] = websocket
     
-    # mode = websocket.query_params.get("mode");
-    # connection_id = websocket.query_params.get("connection_id");
-    
-    if user_id:
-        # Convert user_id to UUID for consistent dictionary key format
-        try:
-            user_id_uuid_key = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
-            state.matcher.active_users[user_id_uuid_key] = websocket # setting user is active
-            state.connection_store.sessions[websocket] = {
-                "uid": user_id_uuid_key, 
-                "is_authenticated": True,
-                # username may arrive later via set_username; set after that message
-                "username": None,
-            }
-            is_authorized = True
-        except (ValueError, TypeError):
-            # If conversion fails, use string as fallback
-            state.matcher.active_users[user_id] = websocket
-    
-    
+    await authenticate(websocket, token)
     # state.matcher.username_map[websocket] = username; 
     async def start_matching(websocket, interests : str = ""):
         username = state.matcher.username_map.get(websocket)
@@ -220,13 +219,23 @@ async def websocket_handler(websocket : WebSocket):
                             })
                     await state.messenger.handle_chat(websocket, data)
                 elif msg_type == "set_username":
-                    print(data);
+                    # print(data);
                     username = data.get("data", {}).get("username")
                     state.matcher.username_map[websocket] = username
                     # backfill session record if it was created earlier (auth path)
                     session = state.connection_store.sessions.get(websocket)
                     if session is not None:
                         session["username"] = username
+                    
+                    # Broadcast online status if user is authenticated
+                    if is_authorized and user_id:
+                        try:
+                            user_id_uuid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+                            await state.messenger.broadcast_online_status(user_id_uuid, username, True)
+                        except Exception as e:
+                            print(f"Error broadcasting online status: {e}")
+                elif msg_type == "auth_confirm":
+                    await authenticate(websocket, data.get("data", {}).get("token", ""))
                 elif msg_type == "system":
                     skipped = await state.messenger.handle_system(websocket, data);
                     print(skipped)

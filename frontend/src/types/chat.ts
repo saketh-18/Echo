@@ -55,4 +55,10 @@ export type setUsernameMessage = {
     }
 }   
 
-export type AnyMessage = WSMessage | systemMessage | savedMessage | typingMessage | errorMessage | startMatchingMessage | setUsernameMessage;
+export type authConfirmMessage = { 
+    type:string,
+    data : {
+        token : string
+    }
+}
+export type AnyMessage = WSMessage | systemMessage | savedMessage | typingMessage | errorMessage | startMatchingMessage | setUsernameMessage | authConfirmMessage;
