@@ -11,6 +11,11 @@ import asyncio
 from core.state import state
 from routers.auth import decode_fastapi_users_jwt, fastapi_users, auth_backend, UserRead, UserCreate, get_token_payload
 from fastapi.middleware.cors import CORSMiddleware
+from database.session import engine
+from database.base import Base
+from database.models.user import User
+from database.models.connection import Connection
+from database.models.messages import Messages
 
 origins = [
     "http://localhost:3000",
@@ -29,6 +34,12 @@ app.add_middleware(
 )
 
 on_test = True
+
+# Initialize database on startup
+@app.on_event("startup")
+async def startup():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
 # logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
 # logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
