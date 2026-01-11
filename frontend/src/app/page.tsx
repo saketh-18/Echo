@@ -1,7 +1,6 @@
 "use client";
 
-import { LoginStore } from "@/stores/login-store";
-import { usernameStore } from "@/stores/username-store";
+import { connectionsRepo } from "@/repositories/connections.repo";
 import Link from "next/link";
 import { useEffect } from "react";
 
@@ -13,10 +12,7 @@ import { useEffect } from "react";
  */
 
 export default function Home() {
-  const setUsername = usernameStore((state) => state.setUsername);
-  const setIsLoggedIn = LoginStore((state) => state.setIsLoggedIn);
-  const isLoggedIn = LoginStore((state) => state.isLoggedIn);
-
+  
   const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "";
   useEffect(() => {
     async function wakeUpRender() {
@@ -25,43 +21,9 @@ export default function Home() {
       console.log(data);
     }
     wakeUpRender();
+    
   }, []);
 
-  let token = "";
-  useEffect(() => {
-    token = localStorage.getItem("token") ?? "";
-  }, []);
-  console.log("tokenn", token);
-  const params = new URLSearchParams();
-  params.set("token", token);
-
-  useEffect(() => {
-    console.log("is this triggering");
-    async function getUsername() {
-      try {
-        if (!token) return; // Don't try to fetch if no token
-        const res = await fetch(`${apiBase}/username`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        });
-        const data = await res.json();
-
-        if (res.ok) {
-          console.log("usernameee  - Landing page", data);
-          setUsername(data.username);
-          setIsLoggedIn(true);
-        } else {
-          setIsLoggedIn(false);
-          console.log("Nott Wworkign");
-        }
-      } catch (e) {
-        console.log("getUsername Error", e);
-      }
-    }
-    getUsername();
-  }, [isLoggedIn]);
   return (
     <main className="relative min-h-screen overflow-hidden bg-bg-dark font-display">
       {/* ================= BACKGROUND GRID ================= */}
@@ -75,21 +37,7 @@ export default function Home() {
           <div className="relative inline-block">
             {/* Soft echo layer */}
             <span
-              className="
-      absolute
-    left-0
-    top-0
-    -z-10
-    translate-x-[2px]
-    translate-y-[2px]
-    text-accent/30
-    text-4xl
-    font-serif
-    font-bold
-    select-none
-    animate-[echoFade_0.6s_ease-out]
-    "
-            >
+              className="absolute left-0 top-0 -z-10 translate-x-[2px] translate-y-[2px] text-accent/30 text-4xl font-serif font-bold select-none animate-[echoFade_0.6s_ease-out]">
               Echo
             </span>
 

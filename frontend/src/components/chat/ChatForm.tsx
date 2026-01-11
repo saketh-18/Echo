@@ -1,21 +1,20 @@
 "use client";
 
+import { sendWsMessage } from "@/lib/websocket/actions";
 import { uiStateStore } from "@/stores/uiState-store";
 import { AnyMessage } from "@/types/chat";
-import { useState } from "react";
+import { FormEvent } from "react";
 
-interface FormProps {
-  send: (arg: AnyMessage) => void;
-}
-export default function ChatForm({ send }: FormProps) {
+export default function ChatForm() {
   const setUiState = uiStateStore((state) => state.setUiState);
   // const [interests, setInterests] = useState("");
 
-  function handleSubmit() {
+  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
     const msg = {
       type: "random",
     };
-    send(msg);
+    sendWsMessage(msg);
     setUiState("searching");
   }
 
@@ -28,7 +27,7 @@ export default function ChatForm({ send }: FormProps) {
       <section className="relative z-10 mx-auto flex max-w-4xl items-center px-8">
         <div className="w-full max-w-md space-y-8">
           {/* Form */}
-          <form className="space-y-5">
+          <form className="space-y-5" onSubmit={handleSubmit}>
             {/* Interests */}
             <div className="space-y-1">
               {/* <input
@@ -58,7 +57,7 @@ export default function ChatForm({ send }: FormProps) {
 
             {/* Submit */}
             <button
-              onClick={handleSubmit}
+              type="submit"
               className="
                 inline-flex
                 items-center

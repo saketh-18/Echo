@@ -1,25 +1,21 @@
-import { usernameStore } from "@/stores/username-store";
-import {
-  AnyMessage,
-  savedMessage,
-  systemMessage,
-  typingMessage,
-  WSMessage,
-} from "@/types/chat";
+import { sendWsMessage } from "@/lib/websocket/actions";
+import { authStore } from "@/stores/auth-store";
+import { AnyMessage } from "@/types/chat";
 import { FormEvent, useLayoutEffect, useRef, useState } from "react";
 
 type setMessageType = (
   arg: AnyMessage | AnyMessage[],
   connection_id?: string
 ) => void;
+
+type setSavedMessageType = (arg: AnyMessage, connection_id: string) => void;
+
 interface chatProps {
   context: string;
-  pairedTo?: string;
-  username: string;
   connectionId?: string;
-  send: (payload: AnyMessage) => void;
   messages: AnyMessage[];
-  setMessages: setMessageType;
+  setMessages?: setMessageType;
+  setSavedMessages?: setSavedMessageType;
 }
 /* 
   Displays Messages and sends messages
@@ -27,20 +23,21 @@ interface chatProps {
 
 export default function ChatBox({
   context,
-  pairedTo,
-  send,
   messages,
   setMessages,
-  username,
   connectionId,
+  setSavedMessages,
 }: chatProps) {
   // For scrolling to bottom on new messages
   const messageRef = useRef<HTMLDivElement>(null);
+  const [currentMsg, setCurrentMsg] = useState("");
+
   function scrollToBottom() {
     messageRef.current?.scrollIntoView({ behavior: "smooth" });
   }
 
-  const [currentMsg, setCurrentMsg] = useState("");
+  // Use .getState() to avoid hook ordering issues - we only need current username, don't need to subscribe to changes
+  const username = authStore.getState().username;
   const sendMessage = (
     e: FormEvent<HTMLFormElement>,
     text: string,
@@ -74,11 +71,11 @@ export default function ChatBox({
 
     setCurrentMsg("");
     if (context === "saved" && connectionId) {
-      setMessages(msg, connectionId);
+      setSavedMessages?.(msg, connectionId);
     } else {
-      setMessages(msg);
+      setMessages?.(msg);
     }
-    send(msg);
+    sendWsMessage(msg);
   };
   useLayoutEffect(() => {
     scrollToBottom();
@@ -171,7 +168,8 @@ export default function ChatBox({
    Chat Bubble
    ====================================================== */
 function ChatBubble({ msg }: { msg: AnyMessage }) {
-  const username = usernameStore((state) => state.username);
+  // Use .getState() to avoid hook ordering issues - ChatBubble is rendered in a map, hooks must be consistent
+  const username = authStore.getState().username;
   const isSystem = msg.type === "system";
   const isYou =
     "data" in msg && "sender" in msg.data && msg.data.sender === username;
@@ -185,7 +183,7 @@ function ChatBubble({ msg }: { msg: AnyMessage }) {
     return (
       <div className="flex justify-center">
         <span className="text-xs text-text-main/45 italic">
-          {"data" in msg ? msg.data.message : ""}
+          {"data" in msg && "message" in msg.data ? msg.data.message : ""}
         </span>
       </div>
     );
@@ -221,7 +219,7 @@ function ChatBubble({ msg }: { msg: AnyMessage }) {
         }
       `}
         >
-          {msg.data.message}
+          {"message" in msg.data ? msg.data.message : ""}
         </div>
 
         {/* Meta row */}

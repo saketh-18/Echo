@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-
+import SocketProvider from "@/providers/SocketProvider";
+import AuthInitializer from "@/providers/authInitializer";
+import RefreshWarning from "@/providers/RefreshWarning";
+import StoreProvider from "@/providers/StoreProvider";
 
 export const metadata: Metadata = {
   title: "Echo",
@@ -15,9 +17,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-      >
-        {children}
+      <body>
+        <StoreProvider>
+          <AuthInitializer />
+          <SocketProvider />
+          <RefreshWarning />
+          {children}
+        </StoreProvider>
       </body>
     </html>
   );

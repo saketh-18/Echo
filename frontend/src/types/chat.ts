@@ -48,4 +48,11 @@ export type startMatchingMessage = {
     interests? : string
 }
 
-export type AnyMessage = WSMessage | systemMessage | savedMessage | typingMessage | errorMessage | startMatchingMessage;
+export type setUsernameMessage = {
+    type: string,
+    data : {
+        username : string
+    }
+}   
+
+export type AnyMessage = WSMessage | systemMessage | savedMessage | typingMessage | errorMessage | startMatchingMessage | setUsernameMessage;

@@ -1,5 +1,6 @@
 "use client";
 
+import { sendWsMessage } from "@/lib/websocket/actions";
 import { messageStateStore } from "@/stores/message-store";
 import { uiStateStore } from "@/stores/uiState-store";
 import { AnyMessage } from "@/types/chat";
@@ -10,11 +11,7 @@ import { AnyMessage } from "@/types/chat";
  * Fills parent container, not full screen
  */
 
-export default function PartnerSkipped({
-  send,
-}: {
-  send: (arg : AnyMessage) => void;
-}) {
+export default function PartnerSkipped() {
 
   const setUiState = uiStateStore((state) => state.setUiState);
   const setRandom = messageStateStore((state) => state.setRandom)
@@ -24,7 +21,7 @@ export default function PartnerSkipped({
     }
     setRandom([]);
     setUiState("searching");
-    send(msg);
+    sendWsMessage(msg);
   }
   return (
     <div className="relative flex h-full w-full items-center justify-center overflow-hidden">

@@ -4,8 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { uiStateStore } from "@/stores/uiState-store";
 import Navbar from "@/components/Navbar";
-import { usernameStore } from "@/stores/username-store";
-import { LoginStore } from "@/stores/login-store";
+import Link from "next/link";
+import { authStore } from "@/stores/auth-store";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -15,9 +15,9 @@ export default function Login() {
   const router = useRouter(); //from next navigation
   const setUiState = uiStateStore((state) => state.setUiState);
   const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "";
-  const setUsername = usernameStore((state) => state.setUsername);
-  const setIsLoggedIn = LoginStore((state) => state.setIsLoggedIn);
-  
+  const setUsername = authStore((state) => state.setUsername);
+  const setIsLoggedIn = authStore((state) => state.setIsLoggedIn);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -40,7 +40,7 @@ export default function Login() {
       }
 
       const data = await res.json();
-
+      localStorage.setItem("token", data.access_token);
       const result = await fetch(`${apiBase}/username`, {
         method: "GET",
         headers: {
@@ -54,10 +54,7 @@ export default function Login() {
       setUsername(username_res.username);
       // localStorage.setItem("username", username_res.username);
       console.log(username_res.username);
-
-      // Store token
-      localStorage.setItem("token", data.access_token);
-
+      localStorage.setItem("username", username_res.username)
       // Optional: redirect after login
       setUiState("form");
       router.push("/chat");
@@ -127,9 +124,12 @@ export default function Login() {
           {/* Helper */}
           <p className="text-sm text-text-main/50">
             Don’t have an account?{" "}
-            <span className="text-text-main underline cursor-pointer">
+            <Link
+              href={"/register"}
+              className="text-text-main underline cursor-pointer"
+            >
               Create one
-            </span>
+            </Link>
           </p>
         </div>
       </main>

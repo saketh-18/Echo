@@ -14,6 +14,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 origins = [
     "http://localhost:3000",
+    "http://localhost:3001",
+    "https://echo-random-chat.vercel.app"
 ]
 
 app = FastAPI()
@@ -103,8 +105,8 @@ async def websocket_handler(websocket : WebSocket):
     # heartbeat_state = {"last_pong" : time.time()};
     # heartbeat_task = asyncio.create_task(heartbeat(websocket, heartbeat_state));
     
-    username = websocket.query_params.get("username");                    
-    state.matcher.username_map[websocket] = username
+    # username = websocket.query_params.get("username");                    
+    # state.matcher.username_map[websocket] = username
     """ AUTHENTICATION """
      
     if token:
@@ -141,7 +143,8 @@ async def websocket_handler(websocket : WebSocket):
             state.connection_store.sessions[websocket] = {
                 "uid": user_id_uuid_key, 
                 "is_authenticated": True,
-                "username": username,
+                # username may arrive later via set_username; set after that message
+                "username": None,
             }
             is_authorized = True
         except (ValueError, TypeError):
@@ -151,6 +154,13 @@ async def websocket_handler(websocket : WebSocket):
     
     # state.matcher.username_map[websocket] = username; 
     async def start_matching(websocket, interests : str = ""):
+        username = state.matcher.username_map.get(websocket)
+        if not username:
+            await websocket.send_json({
+                "type": "error",
+                "data": {"message": "username not set yet; send set_username first"}
+            })
+            return
         user = {
                 "socket" : websocket,
                 "username" : username,
@@ -198,6 +208,14 @@ async def websocket_handler(websocket : WebSocket):
                                 }
                             })
                     await state.messenger.handle_chat(websocket, data)
+                elif msg_type == "set_username":
+                    print(data);
+                    username = data.get("data", {}).get("username")
+                    state.matcher.username_map[websocket] = username
+                    # backfill session record if it was created earlier (auth path)
+                    session = state.connection_store.sessions.get(websocket)
+                    if session is not None:
+                        session["username"] = username
                 elif msg_type == "system":
                     skipped = await state.messenger.handle_system(websocket, data);
                     print(skipped)
